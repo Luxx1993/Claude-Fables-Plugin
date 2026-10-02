@@ -1,0 +1,131 @@
+name: Sync upstream
+
+# Holt neue Commits aus dem Original (henrik-thevibe/Claude-Fables, main) und
+# schlägt sie als Pull Request gegen "deutsch" vor. Gemergt wird nie automatisch.
+# Hinweis: Geplante Workflows laufen nur auf dem Standardbranch des Forks.
+
+on:
+  schedule:
+    - cron: '17 6 * * 1' # montags, 06:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: sync-upstream
+  cancel-in-progress: false
+
+env:
+  UPSTREAM_URL: https://github.com/henrik-thevibe/Claude-Fables.git
+  UPSTREAM_BRANCH: main
+  BASE_BRANCH: deutsch
+  SYNC_BRANCH: sync-upstream
+  CONFLICT_TITLE: 'Upstream-Sync: Merge-Konflikte mit dem Original'
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: deutsch
+          fetch-depth: 0
+
+      - name: Upstream holen
+        run: |
+          git remote add upstream "$UPSTREAM_URL"
+          git fetch --no-tags upstream "$UPSTREAM_BRANCH"
+          git fetch --no-tags origin "$BASE_BRANCH"
+
+      - name: Neue Commits prüfen
+        id: check
+        run: |
+          count=$(git rev-list --count "origin/$BASE_BRANCH..upstream/$UPSTREAM_BRANCH")
+          echo "Neue Upstream-Commits: $count"
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+
+      - name: Sync-Branch vorbereiten und mergen
+        id: merge
+        if: steps.check.outputs.count != '0'
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          # Bestehenden Sync-Branch weiterverwenden (nie force-pushen), sonst neu von deutsch.
+          if git ls-remote --exit-code --heads origin "$SYNC_BRANCH" >/dev/null; then
+            git fetch --no-tags origin "$SYNC_BRANCH"
+            git checkout -B "$SYNC_BRANCH" "origin/$SYNC_BRANCH"
+          else
+            git checkout -B "$SYNC_BRANCH" "origin/$BASE_BRANCH"
+          fi
+          conflicts=no
+          # Erst deutsch nachziehen (falls es sich bewegt hat), dann das Original.
+          git merge --no-edit "origin/$BASE_BRANCH" || conflicts=yes
+          if [ "$conflicts" = no ]; then
+            git merge --no-ff -m "Merge upstream/$UPSTREAM_BRANCH in $BASE_BRANCH" "upstream/$UPSTREAM_BRANCH" || conflicts=yes
+          fi
+          if [ "$conflicts" = yes ]; then
+            git diff --name-only --diff-filter=U > "$RUNNER_TEMP/conflicts.txt"
+            git merge --abort
+          fi
+          echo "conflicts=$conflicts" >> "$GITHUB_OUTPUT"
+
+      - name: Branch pushen und Pull Request anlegen oder aktualisieren
+        if: steps.check.outputs.count != '0' && steps.merge.outputs.conflicts == 'no'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git push origin "$SYNC_BRANCH"
+          {
+            echo "Neue Commits aus [henrik-thevibe/Claude-Fables](https://github.com/henrik-thevibe/Claude-Fables) (\`$UPSTREAM_BRANCH\`), noch nicht in \`$BASE_BRANCH\`."
+            echo
+            echo "### Commits"
+            git log --no-merges --format='- %h %s (%an)' "origin/$BASE_BRANCH..upstream/$UPSTREAM_BRANCH"
+            echo
+            echo "### Diff-Überblick"
+            echo '```'
+            git diff --stat "origin/$BASE_BRANCH...upstream/$UPSTREAM_BRANCH"
+            echo '```'
+            echo
+            echo "Wird nie automatisch gemergt: bitte prüfen und selbst mergen."
+          } > "$RUNNER_TEMP/body.md"
+          existing=$(gh pr list --head "$SYNC_BRANCH" --base "$BASE_BRANCH" --state open --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh pr edit "$existing" --body-file "$RUNNER_TEMP/body.md"
+            echo "Pull Request #$existing aktualisiert."
+          else
+            gh pr create --head "$SYNC_BRANCH" --base "$BASE_BRANCH" \
+              --title "Upstream-Sync: Änderungen aus dem Original" \
+              --body-file "$RUNNER_TEMP/body.md"
+          fi
+
+      - name: Issue bei Merge-Konflikten anlegen oder aktualisieren
+        if: steps.check.outputs.count != '0' && steps.merge.outputs.conflicts == 'yes'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "Der automatische Merge von \`upstream/$UPSTREAM_BRANCH\` in \`$BASE_BRANCH\` hat Konflikte. Es wurde kein Pull Request angelegt und nichts gepusht."
+            echo
+            echo "### Betroffene Dateien"
+            sed 's/^/- `/; s/$/`/' "$RUNNER_TEMP/conflicts.txt"
+            echo
+            echo "### Neue Upstream-Commits"
+            git log --no-merges --format='- %h %s (%an)' "origin/$BASE_BRANCH..upstream/$UPSTREAM_BRANCH"
+            echo
+            echo "### Lokal lösen"
+            echo '```sh'
+            echo "git remote add upstream $UPSTREAM_URL   # falls noch nicht vorhanden"
+            echo "git fetch upstream && git checkout $BASE_BRANCH && git pull"
+            echo "git merge upstream/$UPSTREAM_BRANCH     # Konflikte lösen, committen, pushen"
+            echo '```'
+          } > "$RUNNER_TEMP/issue.md"
+          existing=$(gh issue list --state open --search "\"$CONFLICT_TITLE\" in:title" --json number,title --jq "map(select(.title == \"$CONFLICT_TITLE\")) | .[0].number // empty")
+          if [ -n "$existing" ]; then
+            gh issue edit "$existing" --body-file "$RUNNER_TEMP/issue.md"
+            echo "Issue #$existing aktualisiert."
+          else
+            gh issue create --title "$CONFLICT_TITLE" --body-file "$RUNNER_TEMP/issue.md"
+          fi
