@@ -60,6 +60,8 @@ jobs:
           else
             git checkout -B "$SYNC_BRANCH" "origin/$BASE_BRANCH"
           fi
+          # Die deutsche README gewinnt (.gitattributes: README.md merge=ours); ihre Änderungen im Original meldet der PR.
+          git config merge.ours.driver true
           conflicts=no
           # Erst deutsch nachziehen (falls es sich bewegt hat), dann das Original.
           git merge --no-edit "origin/$BASE_BRANCH" || conflicts=yes
@@ -88,6 +90,17 @@ jobs:
             echo '```'
             git diff --stat "origin/$BASE_BRANCH...upstream/$UPSTREAM_BRANCH"
             echo '```'
+            git diff "origin/$BASE_BRANCH...upstream/$UPSTREAM_BRANCH" -- README.md > "$RUNNER_TEMP/readme.diff"
+            if [ -s "$RUNNER_TEMP/readme.diff" ]; then
+              echo
+              echo "### ⚠️ README im Original geändert: bitte nachübersetzen"
+              echo "Die deutsche \`README.md\` bleibt beim Merge unverändert. Diese englischen Änderungen sind **nicht** übernommen (z. B. in einer Claude-Sitzung: „Übersetze die README-Änderungen aus diesem PR“):"
+              echo
+              echo '```diff'
+              head -c 30000 "$RUNNER_TEMP/readme.diff"
+              echo
+              echo '```'
+            fi
             echo
             echo "Wird nie automatisch gemergt: bitte prüfen und selbst mergen."
           } > "$RUNNER_TEMP/body.md"

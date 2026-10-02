@@ -1,0 +1,3 @@
+# Die deutsche README gewinnt beim Merge mit dem Original (Treiber "ours", siehe sync-upstream.yml).
+# Lokal einmalig nötig: git config merge.ours.driver true
+README.md merge=ours
