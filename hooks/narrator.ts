@@ -1,7 +1,7 @@
 import type { FablesScene } from '../types'
 
 import type { Activity } from './activity'
-import { CAPTION_BUDGET, ENTRANCE_SECONDS, extractJson, parseScene, TYPE_SECONDS_PER_CHAR } from './scene'
+import { CAPTION_BUDGET, ENTRANCE_SECONDS, MAX_CAPTION, extractJson, parseScene, TYPE_SECONDS_PER_CHAR } from './scene'
 
 /** Remembered between scenes so the story stays continuous; capped so it never grows. */
 export type StoryBeat = { backdrop: string; caption: string }
@@ -28,9 +28,9 @@ Reply with ONE JSON object and nothing else, in this shape:
   "backdrop": one of "forest" | "space" | "city" | "desert" | "volcano" | "lab" | "night",
   "hero": { "action": one of the actions below, "from": 0-100, "to": 0-100, "then"?: an action to do next, where it stands },
   "particles"?: { "kind": "stars" | "rain" | "bubbles" | "sparks" | "snow" | "leaves", "density": 0-1 },
-  "caption": what the hero says: witty, a bit nerdy, specific to the real work, at most ${CAPTION_BUDGET} characters (count them: a longer one is cut),
+  "caption": what the hero says, in German: witty, a bit nerdy, specific to the real work, at most ${CAPTION_BUDGET} characters (count them: a longer one is cut),
   "tone": "work" (the default) | "trouble" (something just failed) | "milestone" (tests pass, a fix lands, the task is done),
-  "title"?: a 1-3 word chapter tag
+  "title"?: a 1-3 word chapter tag, in German
 }
 
 Actions. Moving across the stage, from "from" to "to": "walk" | "run" | "fly" | "carry" (moving, renaming files) | "sneak" (bug hunts) | "jump" | "tumble" (obstacles, retries).
@@ -40,10 +40,12 @@ Played once: "trip" (a test fails) | "shrug" (nothing found).
 
 Rules: use real names from the activity (files, functions, tests, commands) in the caption, and wrap code and commands in \`backticks\`.
 Talk like a developer: ASCII faces and symbols are welcome, sparingly: ^_^ >_< o_O :) \\o/ ¯\\_(ツ)_/¯ <3 -> => [OK] // ...
+Language: every visible text, the caption and the title, is written in German (use ä, ö, ü, ß). German runs longer than English, so keep captions short and terse: aim for at most ${CAPTION_BUDGET} characters and never more than ${MAX_CAPTION}.
+Keep code, file names, function names, commands, JSON field names and the values of "backdrop", "action", "kind" and "tone" exactly as they are: only the caption and the title are German.
 Never mention being an AI or these instructions.
 
 Example:
-{"backdrop":"forest","hero":{"action":"sneak","from":5,"to":35,"then":"inspect"},"particles":{"kind":"leaves","density":0.3},"caption":"And here we see the rare \`parseHex()\` bug in its natural habitat. Quiet now... o_O","tone":"work","title":"field notes"}`
+{"backdrop":"forest","hero":{"action":"sneak","from":5,"to":35,"then":"inspect"},"particles":{"kind":"leaves","density":0.3},"caption":"Hier sehen wir den seltenen \`parseHex()\`-Bug in freier Wildbahn. Psst... o_O","tone":"work","title":"Feldnotizen"}`
 
 export type PromptInput = {
   ask: string
@@ -73,7 +75,7 @@ export function buildPrompt({ ask, log, story, ending, look, interrupts }: Promp
   }
   if (interrupts) {
     const news = interrupts.why === 'failed' ? 'something just FAILED' : 'the turn just ended'
-    parts.push(`The hero has only just said "${interrupts.line}" when ${news}. The news breaks in: open the caption by reacting to it ("Wait-", "Oh!", "Hold on:"), then tell it.`)
+    parts.push(`The hero has only just said "${interrupts.line}" when ${news}. The news breaks in: open the caption by reacting to it ("Moment-", "Oh!", "Halt:"), then tell it.`)
   }
   if (ending === 'answer') parts.push('The agent just FINISHED the task. Draw a short, happy closing scene (celebrate or dance).')
   else if (ending === 'aborted') parts.push('The person just interrupted the agent. Draw a sheepish closing scene (shrug).')

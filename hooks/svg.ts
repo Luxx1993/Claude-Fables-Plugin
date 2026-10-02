@@ -518,8 +518,8 @@ type Kind = 'plain' | 'code' | 'path' | 'fn' | 'num' | 'bad' | 'good' | 'face'
 /** How a kind of word is set: in its color from the paper, and numbers, failures and successes in bold. */
 const kindAttrs = (kind: WordKind, skin: Paper) => `fill="${skin.kinds[kind]}"${kind === 'num' || kind === 'bad' || kind === 'good' ? ' font-weight="700"' : ''}`
 const FACE = /^(\^_\^|\^\^;?|>_<|>\.<|o_O|O_o|o\.O|:-?[)(DPpO3|/]|;-?\)|[xX]D|T_T|-_-|\._\.|\\o\/|<3|¯\\_\(ツ\)_\/¯|\(•_•\)|\(⌐■_■\)|->|=>|<-|~>|>>>|\.\.\.|\[(OK|ok|WIP|TODO|DONE)\]|\/\/|#!|\$|&&|\|\|)$/
-const BAD = /^(✗|FAIL(ED)?|failed|failing|fails|broke|broken|crash(ed|es)?|red|\w*Error|\w*Exception|N\+1|panic|segfault|404|500)$/
-const GOOD = /^(✓|PASS(ED)?|passed|passes|passing|green|clean|fixed|ships?|shipped|done|OK|merged|liftoff|LGTM)$/i
+const BAD = /^(✗|FAIL(ED)?|failed|failing|fails|broke|broken|crash(ed|es)?|red|\w*Error|\w*Exception|N\+1|panic|segfault|404|500|[Ff]ehler\w*|[Ff]ehlgeschlagen|[Ff]ehlschl(ag|äge)\w*|gescheitert|abgestürzt|[Aa]bsturz|kaputt|rot)$/
+const GOOD = /^(✓|PASS(ED)?|passed|passes|passing|green|clean|fixed|ships?|shipped|done|OK|merged|liftoff|LGTM|bestanden|erfolgreich|sauber|grün|behoben|fertig|gelungen|gemergt|abgeschlossen)$/i
 const NUM = /^[~+\-]?\d[\d.,]*(%|x|×|s|ms|kb|mb|gb|k)?$|^\d+\/\d+$/i
 const FN = /^[\w.$#]+\(\)$/
 const PATH = /^[\w@~./-]*\w\.(tsx?|jsx?|mjs|cjs|py|rb|go|rs|java|kt|swift|json|ya?ml|toml|css|scss|html|md|sql|sh|lock|env|test\.ts)$|^~?\.?\/?[\w@.-]+\/[\w@./-]*$/i
